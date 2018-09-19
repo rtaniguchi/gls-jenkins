@@ -1,0 +1,105 @@
+---
+- name: Deploy Jenkins
+  hosts: all
+  vars:
+    jenkins_cli_jar: /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar
+    jenkins_plugins:
+    - aws-java-sdk
+    - bitbucket
+    - blueocean
+    - blueocean-bitbucket-pipeline
+    - blueocean-core-js
+    - blueocean-pipeline-editor
+    - bouncycastle-api
+    - blueocean-commons
+    - blueocean-config
+    - config-file-provider
+    - blueocean-dashboard
+    - jenkins-design-language
+    - durable-task
+    - email-ext
+    - blueocean-events
+    - git-parameter
+    - blueocean-git-pipeline
+    - blueocean-github-pipeline
+    - blueocean-i18n
+    - jira
+    - blueocean-jira
+    - openshift-client
+    - blueocean-jwt
+    - pam-auth
+    - blueocean-personalization
+    - blueocean-pipeline-api-impl
+    - blueocean-pipeline-scm-api
+    - workflow-basic-steps
+    - pipeline-model-definition
+    - pipeline-model-extensions
+    - workflow-cps
+    - workflow-job
+    - pipeline-model-api
+    - workflow-durable-task-step
+    - workflow-cps-global-lib
+    - pipeline-stage-tags-metadata
+    - build-pipeline-plugin
+    - blueocean-rest
+    - blueocean-rest-impl
+    - rocketchatnotifier
+    - script-security
+    - ssh-slaves
+    - run-condition
+    - workflow-support
+    - blueocean-web
+    - junit
+  tasks:
+    - name: install yum dependencies
+      yum: name={{ item }} state=installed
+      become: True
+      with_items:
+        - git
+        - java-1.8.0-openjdk-devel
+    - name: Download Jenkins repository file
+      get_url: url=https://pkg.jenkins.io/redhat/jenkins.repo validate_certs=false dest=/etc/yum.repos.d/jenkins.repo
+      become: True
+    - name: Download Jenkins RPM key
+      rpm_key: key=https://pkg.jenkins.io/redhat/jenkins.io.key validate_certs=false 
+      become: True
+    - name: Install Jenkins
+      yum: name=jenkins validate_certs=false 
+      become: True
+    - name: Start Jenkins service, if not running
+      service: name=jenkins state=started
+      become: true
+    - name: Enable Jenkins service
+      service: name=jenkins enabled=true
+      become: true        
+    - name: Enable Jenkins service
+      firewalld: port=8080/tcp permanent=true state=enabled
+      become: true
+    - name: Jenkins | Create Jenkins updates folder.
+      file:
+        path: /var/lib/jenkins/updates
+        owner: jenkins
+        group: jenkins
+        mode: 0755
+        state: directory
+    - name: Jenkins | Update Jenkins plugin data.
+      shell: >
+        curl -L https://updates.jenkins-ci.org/update-center.json | sed '1d;$d' > /var/lib/jenkins/updates/default.json
+        creates=/var/lib/jenkins/updates/default.json
+      sudo: yes
+    - name: Jenkins | Permissions for default.json updates info.
+      file:
+        path: /var/lib/jenkins/updates/default.json
+        owner: jenkins
+        group: jenkins
+        mode: 0755
+      sudo: yes
+    - wait_for: port=8080 delay=20
+    - name: Jenkins | Install Jenkins plugins.
+      command: >
+        java -jar {{ jenkins_cli_jar }} -s http://{{ jenkins_hostname }}:8080{{ jenkins_url_prefix | default('') }}/ install-plugin {{ item }}
+        creates=/var/lib/jenkins/plugins/{{ item }}.jpi
+      with_items: jenkins_plugins
+      become: yes
+      become_user: jenkins
+      notify: restart jenkins
