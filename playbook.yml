@@ -3,6 +3,10 @@
   hosts: all
   vars:
     jenkins_cli_jar: /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar
+    jenkins_home: /var/lib/jenkins
+    jenkins_hostname: localhost
+    jenkins_admin_username: jenkinsadm
+    jenkins_admin_password: GLS-redhat123!
     jenkins_plugins:
     - aws-java-sdk
     - bitbucket
@@ -72,34 +76,53 @@
     - name: Enable Jenkins service
       service: name=jenkins enabled=true
       become: true        
-    - name: Enable Jenkins service
+    - name: Enable Jenkins firewall
       firewalld: port=8080/tcp permanent=true state=enabled
       become: true
+    - name: Jenkins - configure | Turn off Jenkins setup wizard
+      lineinfile: dest=/etc/sysconfig/jenkins regexp='^JENKINS_JAVA_OPTIONS=' line='JENKINS_JAVA_OPTIONS="-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"'
+      notify: restart jenkins
+      become: true        
+    - name: Create initialization scripts directory
+      file: path={{ jenkins_home }}/init.groovy.d
+        state=directory
+        owner=jenkins
+        group=jenkins
+        mode=0775
+      become: true        
+    - name: Add initialization script to setup basic security
+      template: src=security.groovy.j2
+        dest={{ jenkins_home }}/init.groovy.d/security.groovy
+      become: true        
     - name: Jenkins | Create Jenkins updates folder.
-      file:
-        path: /var/lib/jenkins/updates
-        owner: jenkins
-        group: jenkins
-        mode: 0755
-        state: directory
+      file: path={{ jenkins_home }}/updates
+        owner=jenkins
+        group=jenkins
+        mode=0755
+        state=directory
+      become: true        
     - name: Jenkins | Update Jenkins plugin data.
       shell: >
         curl -L https://updates.jenkins-ci.org/update-center.json | sed '1d;$d' > /var/lib/jenkins/updates/default.json
         creates=/var/lib/jenkins/updates/default.json
-      sudo: yes
+      become: true
     - name: Jenkins | Permissions for default.json updates info.
-      file:
-        path: /var/lib/jenkins/updates/default.json
-        owner: jenkins
-        group: jenkins
-        mode: 0755
-      sudo: yes
+      file: path={{ jenkins_home }}/updates/default.json
+        owner=jenkins
+        group=jenkins
+        mode=0755
+      become: true        
     - wait_for: port=8080 delay=20
     - name: Jenkins | Install Jenkins plugins.
       command: >
-        java -jar {{ jenkins_cli_jar }} -s http://{{ jenkins_hostname }}:8080{{ jenkins_url_prefix | default('') }}/ install-plugin {{ item }}
+        java -jar {{ jenkins_cli_jar }} -s http://{{ jenkins_hostname }}:8080{{ jenkins_url_prefix | default('') }}/ -i /vagrant/jenkins_id_rsa install-plugin {{ item }}
         creates=/var/lib/jenkins/plugins/{{ item }}.jpi
       with_items: jenkins_plugins
-      become: yes
+      become: true
       become_user: jenkins
       notify: restart jenkins
+
+  handlers:      
+    - name: restart jenkins
+      service: name=jenkins state=restarted
+      become: true
