@@ -11,16 +11,6 @@
     - name: install Java
       include_role:
         name: geerlingguy.java
-#    - name: get remote jenkins admin password file
-#      slurp:
-#        src: "{{ jenkins_admin_password_file }}" 
-#      register: adminpasswordfile
-#      no_log: False
-#      when: jenkins_admin_password_file != "" 
-#    - name: set jenkins admin password
-#      set_fact:
-#        jenkins_admin_password: "{{ adminpasswordfile.content | b64decode | trim }}"
-#      no_log: True
     - name: install jenkins
       include_role:
         name: geerlingguy.jenkins
