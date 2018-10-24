@@ -22,11 +22,15 @@ Vagrant.configure("2") do |config|
   config.vm.network "private_network", ip: "192.168.33.10"
   config.vm.synced_folder "installers", "/vagrant_data"
 #  config.vm.provision "shell", inline: <<-SHELL
-#     sudo yum update -y
-#     sudo subscription-manager repos --enable rhel-7-server-ansible-2.6-rpms
-#     sudo yum install ansible -y
-#   SHELL
+    #sudo yum -y install ansible
+    #sudo ansible-galaxy install geerlingguy.jenkins
+#  SHELL
+   config.vm.provision "ansible_local" do |ansible|
+     ansible.playbook = "galaxy.yml"
+     ansible.inventory_path = "hosts"
+     ansible.limit = "all"
 
+   end
    config.vm.provision "ansible_local" do |ansible|
      ansible.playbook = "playbook.yml"
      ansible.inventory_path = "hosts"

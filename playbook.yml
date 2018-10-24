@@ -1,128 +1,26 @@
----
-- name: Deploy Jenkins
-  hosts: all
+- hosts: all
+  become: yes
   vars:
-    jenkins_cli_jar: /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar
-    jenkins_home: /var/lib/jenkins
     jenkins_hostname: localhost
     jenkins_admin_username: jenkinsadm
     jenkins_admin_password: GLS-redhat123!
-    jenkins_plugins:
-    - aws-java-sdk
-    - bitbucket
-    - blueocean
-    - blueocean-bitbucket-pipeline
-    - blueocean-core-js
-    - blueocean-pipeline-editor
-    - bouncycastle-api
-    - blueocean-commons
-    - blueocean-config
-    - config-file-provider
-    - blueocean-dashboard
-    - jenkins-design-language
-    - durable-task
-    - email-ext
-    - blueocean-events
-    - git-parameter
-    - blueocean-git-pipeline
-    - blueocean-github-pipeline
-    - blueocean-i18n
-    - jira
-    - blueocean-jira
-    - openshift-client
-    - blueocean-jwt
-    - pam-auth
-    - blueocean-personalization
-    - blueocean-pipeline-api-impl
-    - blueocean-pipeline-scm-api
-    - workflow-basic-steps
-    - pipeline-model-definition
-    - pipeline-model-extensions
-    - workflow-cps
-    - workflow-job
-    - pipeline-model-api
-    - workflow-durable-task-step
-    - workflow-cps-global-lib
-    - pipeline-stage-tags-metadata
-    - build-pipeline-plugin
-    - blueocean-rest
-    - blueocean-rest-impl
-    - rocketchatnotifier
-    - script-security
-    - ssh-slaves
-    - run-condition
-    - workflow-support
-    - blueocean-web
-    - junit
+#    jenkins_admin_password_file: /var/lib/jenkins/secrets/initialAdminPassword
+    jenkins_plugins: [ aws-java-sdk, bitbucket, blueocean, blueocean-bitbucket-pipeline, blueocean-core-js, blueocean-pipeline-editor, bouncycastle-api, blueocean-commons, blueocean-config, config-file-provider, blueocean-dashboard, jenkins-design-language, durable-task, email-ext, blueocean-events, git-parameter, blueocean-git-pipeline, blueocean-github-pipeline, blueocean-i18n, jira, blueocean-jira, openshift-client, blueocean-jwt, pam-auth, blueocean-personalization, blueocean-pipeline-api-impl, blueocean-pipeline-scm-api, workflow-basic-steps, pipeline-model-definition, pipeline-model-extensions, workflow-cps, workflow-job, pipeline-model-api, workflow-durable-task-step, workflow-cps-global-lib, pipeline-stage-tags-metadata, build-pipeline-plugin, blueocean-rest, blueocean-rest-impl, rocketchatnotifier, script-security, ssh-slaves, run-condition, workflow-support, blueocean-web, junit ]
+    jenkins_plugins_install_dependencies: true
   tasks:
-    - name: install yum dependencies
-      yum: name={{ item }} state=installed
-      become: True
-      with_items:
-        - git
-        - java-1.8.0-openjdk-devel
-    - name: Download Jenkins repository file
-      get_url: url=https://pkg.jenkins.io/redhat/jenkins.repo validate_certs=false dest=/etc/yum.repos.d/jenkins.repo
-      become: True
-    - name: Download Jenkins RPM key
-      rpm_key: key=https://pkg.jenkins.io/redhat/jenkins.io.key validate_certs=false 
-      become: True
-    - name: Install Jenkins
-      yum: name=jenkins validate_certs=false 
-      become: True
-    - name: Start Jenkins service, if not running
-      service: name=jenkins state=started
-      become: true
-    - name: Enable Jenkins service
-      service: name=jenkins enabled=true
-      become: true        
-    - name: Enable Jenkins firewall
-      firewalld: port=8080/tcp permanent=true state=enabled
-      become: true
-    - name: Jenkins - configure | Turn off Jenkins setup wizard
-      lineinfile: dest=/etc/sysconfig/jenkins regexp='^JENKINS_JAVA_OPTIONS=' line='JENKINS_JAVA_OPTIONS="-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false"'
-      notify: restart jenkins
-      become: true        
-    - name: Create initialization scripts directory
-      file: path={{ jenkins_home }}/init.groovy.d
-        state=directory
-        owner=jenkins
-        group=jenkins
-        mode=0775
-      become: true        
-    - name: Add initialization script to setup basic security
-      template: src=security.groovy.j2
-        dest={{ jenkins_home }}/init.groovy.d/security.groovy
-      become: true        
-    - name: Jenkins | Create Jenkins updates folder.
-      file: path={{ jenkins_home }}/updates
-        owner=jenkins
-        group=jenkins
-        mode=0755
-        state=directory
-      become: true        
-    - name: Jenkins | Update Jenkins plugin data.
-      shell: >
-        curl -L https://updates.jenkins-ci.org/update-center.json | sed '1d;$d' > /var/lib/jenkins/updates/default.json
-        creates=/var/lib/jenkins/updates/default.json
-      become: true
-    - name: Jenkins | Permissions for default.json updates info.
-      file: path={{ jenkins_home }}/updates/default.json
-        owner=jenkins
-        group=jenkins
-        mode=0755
-      become: true        
-    - wait_for: port=8080 delay=20
-    - name: Jenkins | Install Jenkins plugins.
-      command: >
-        java -jar {{ jenkins_cli_jar }} -s http://{{ jenkins_hostname }}:8080{{ jenkins_url_prefix | default('') }}/ -i /vagrant/jenkins_id_rsa install-plugin {{ item }}
-        creates=/var/lib/jenkins/plugins/{{ item }}.jpi
-      with_items: jenkins_plugins
-      become: true
-      become_user: jenkins
-      notify: restart jenkins
-
-  handlers:      
-    - name: restart jenkins
-      service: name=jenkins state=restarted
-      become: true
+    - name: install Java
+      include_role:
+        name: geerlingguy.java
+#    - name: get remote jenkins admin password file
+#      slurp:
+#        src: "{{ jenkins_admin_password_file }}" 
+#      register: adminpasswordfile
+#      no_log: False
+#      when: jenkins_admin_password_file != "" 
+#    - name: set jenkins admin password
+#      set_fact:
+#        jenkins_admin_password: "{{ adminpasswordfile.content | b64decode | trim }}"
+#      no_log: True
+    - name: install jenkins
+      include_role:
+        name: geerlingguy.jenkins

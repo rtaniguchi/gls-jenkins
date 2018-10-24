@@ -1,0 +1,4 @@
+- hosts: all
+  tasks:
+    - name: install galaxy dependency
+      shell: ansible-galaxy install geerlingguy.jenkins
